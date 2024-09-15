@@ -10,37 +10,28 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 from evaluate import evaluate
+from mynet import MyNet
+from inception import InceptionNet
 
 
 use_cuda = torch.cuda.is_available()
 
+def gpu_memory_info():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        allocated = torch.cuda.memory_allocated(device) / 1024**3  # in GB
+        cached = torch.cuda.memory_reserved(device) / 1024**3  # in GB
+        total_memory = torch.cuda.get_device_properties(device).total_memory / 1024**3  # in GB
 
-class MyNet(nn.Module):
-    def __init__(self,input_dim, nChannel=100, nConv=2):
-        super(MyNet, self).__init__()
-        self.nChannel = nChannel
-        self.nConv = nConv
-        self.conv1 = nn.Conv2d(input_dim, self.nChannel, kernel_size=3, stride=1, padding=1 )
-        self.bn1 = nn.BatchNorm2d(self.nChannel)
-        self.conv2 = nn.ModuleList()
-        self.bn2 = nn.ModuleList()
-        for i in range(self.nConv-1):
-            self.conv2.append( nn.Conv2d(self.nChannel, self.nChannel, kernel_size=3, stride=1, padding=1 ) )
-            self.bn2.append( nn.BatchNorm2d(self.nChannel) )
-        self.conv3 = nn.Conv2d(self.nChannel, self.nChannel, kernel_size=1, stride=1, padding=0 )
-        self.bn3 = nn.BatchNorm2d(self.nChannel)
+        print(f"\nAllocated GPU Memory: {allocated:.2f} GB")
+        print(f"Cached GPU Memory: {cached:.2f} GB")
+        print(f"Total GPU Memory: {total_memory:.2f} GB")
+    else:
+        print("CUDA is not available.")
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu( x )
-        x = self.bn1(x)
-        for i in range(self.nConv-1):
-            x = self.conv2[i](x)
-            x = F.relu( x )
-            x = self.bn2[i](x)
-        x = self.conv3(x)
-        x = self.bn3(x)
-        return x
+def clear_gpu_cache():
+    torch.cuda.empty_cache()
+    print("GPU cache cleared.")
 
 
 def load_image(image_path):
@@ -53,6 +44,9 @@ def load_image(image_path):
 
 
 def train(config):
+    gpu_memory_info()
+    clear_gpu_cache()
+    gpu_memory_info()
     data, im = load_image(config['input'])
 
     # load scribble
@@ -73,7 +67,7 @@ def train(config):
         config['minLabels'] = len(mask_inds)
 
     # train
-    model = MyNet( data.size(1), config['nChannel'], config['nConv'] )
+    model = InceptionNet( input_dim = data.size(1), nChannel = config['nChannel'], nConv = config['nConv'] )
     if use_cuda:
         model.cuda()
     model.train()
@@ -95,7 +89,6 @@ def train(config):
         HPz_target = HPz_target.cuda()
         
     optimizer = optim.SGD(model.parameters(), lr=config['lr'], momentum=0.9)
-    label_colours = np.random.randint(255,size=(100,3))
 
     for batch_idx in range(config['maxIter']):
         # forwarding

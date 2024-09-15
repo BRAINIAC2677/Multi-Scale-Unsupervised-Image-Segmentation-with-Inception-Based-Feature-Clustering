@@ -72,5 +72,6 @@ if __name__ == '__main__':
             print(f'\n{i} / {args.nEvalImg} | {img_filename}: {miou}')
             print(f'Mean IoU: {np.mean(mious)}\n')
 
-    print(f'MIoU for {args.nEvalImg} images: {mious}')
+    for i in range(len(img_filenames)):
+        print(f'{img_filenames[i]}: {mious[i]}')
     print(f'\nMean IoU: {np.mean(mious)}\n')
