@@ -2,6 +2,8 @@
 import cv2
 import numpy as np
 import torch.nn.functional as F
+from scipy.optimize import linear_sum_assignment
+
 
 VOC_CLASSES = [
     'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
@@ -30,40 +32,145 @@ def convert_voc_gt_to_labels(gt_path):
 
     return label_map
 
+
 def calculate_miou(pred_labels, gt_labels):
+    """
+    Calculates the mIoU using the Hungarian matching algorithm.
+    
+    Args:
+        pred_labels (np.ndarray): Predicted segmentation labels (2D or 3D array).
+        gt_labels (np.ndarray): Ground truth segmentation labels (2D or 3D array).
+        
+    Returns:
+        float: Mean Intersection over Union (mIoU).
+    """
     # Reshape the arrays into 1D
     gt_labels_1d = gt_labels.reshape(-1)
     pred_labels_1d = pred_labels.reshape(-1)
     
-    # Get unique labels from ground truth
-    unique_labels = np.unique(gt_labels_1d)
+    # Get unique ground truth and predicted labels
+    unique_gt_labels = np.unique(gt_labels_1d)
+    unique_pred_labels = np.unique(pred_labels_1d)
     
-    miou_list = []
+    # Initialize IoU cost matrix (rows: ground truth, columns: predicted)
+    cost_matrix = np.zeros((len(unique_gt_labels), len(unique_pred_labels)))
     
-    # Iterate over each unique label
-    for label in unique_labels:
-        # Find indices where the current label is present in ground truth
-        gt_indices = np.where(gt_labels_1d == label)[0]
-        
-        # Get the predicted labels at these indices
-        pred_at_gt_indices = pred_labels_1d[gt_indices]
-        
-        # Get unique predicted labels at these indices
-        unique_pred_labels = np.unique(pred_at_gt_indices)
-        
-        # Calculate histogram and fractions for IoU calculation
-        hist = [np.sum(pred_at_gt_indices == u) for u in unique_pred_labels]
-        fractions = [len(gt_indices) + np.sum(pred_labels_1d == u) - np.sum(pred_at_gt_indices == u) for u in unique_pred_labels]
-        
-        # Calculate IoU for each unique predicted label
-        ious = np.array(hist) / np.array(fractions, dtype='float')
-        
-        # Append the maximum IoU for the current label to the list
-        miou_list.append(np.max(ious))
+    # Compute IoU for each ground truth and predicted label pair
+    for i, gt_label in enumerate(unique_gt_labels):
+        for j, pred_label in enumerate(unique_pred_labels):
+            # Find indices for the current ground truth and predicted label
+            gt_indices = np.where(gt_labels_1d == gt_label)[0]
+            pred_indices = np.where(pred_labels_1d == pred_label)[0]
+            
+            # Calculate intersection and union
+            intersection = len(np.intersect1d(gt_indices, pred_indices))
+            union = len(np.union1d(gt_indices, pred_indices))
+            
+            # IoU = intersection / union, set cost as 1 - IoU
+            cost_matrix[i, j] = 1 - (intersection / union if union > 0 else 0)
     
-    mean_iou = np.mean(miou_list)
+    # Apply Hungarian algorithm to find optimal matching
+    row_indices, col_indices = linear_sum_assignment(cost_matrix)
+    
+    # Calculate mIoU using the optimal matching
+    matched_ious = []
+    for row, col in zip(row_indices, col_indices):
+        iou = 1 - cost_matrix[row, col]  # Recover IoU from the cost matrix
+        matched_ious.append(iou)
+    
+    # Compute the mean IoU over all matched pairs
+    mean_iou = np.mean(matched_ious)
     return mean_iou
+
+
+def calculate_accuracy(pred_labels, gt_labels):
+    """
+    Calculates accuracy for unsupervised image segmentation using Hungarian matching.
+    
+    Args:
+        pred_labels (np.ndarray): Predicted segmentation labels (2D or 3D array).
+        gt_labels (np.ndarray): Ground truth segmentation labels (2D or 3D array).
+    
+    Returns:
+        float: Accuracy as a fraction of correctly labeled pixels.
+    """
+    # Reshape the arrays into 1D
+    gt_labels_1d = gt_labels.reshape(-1)
+    pred_labels_1d = pred_labels.reshape(-1)
+    
+    # Get unique ground truth and predicted labels
+    unique_gt_labels = np.unique(gt_labels_1d)
+    unique_pred_labels = np.unique(pred_labels_1d)
+    
+    # Initialize the cost matrix (rows: ground truth, columns: predicted)
+    cost_matrix = np.zeros((len(unique_gt_labels), len(unique_pred_labels)))
+    
+    # Populate the cost matrix (negative intersection for Hungarian minimization)
+    for i, gt_label in enumerate(unique_gt_labels):
+        for j, pred_label in enumerate(unique_pred_labels):
+            # Find the intersection (common pixels) between the labels
+            gt_indices = np.where(gt_labels_1d == gt_label)[0]
+            pred_indices = np.where(pred_labels_1d == pred_label)[0]
+            intersection = len(np.intersect1d(gt_indices, pred_indices))
+            
+            # Use -intersection as cost (minimizing negative intersection maximizes accuracy)
+            cost_matrix[i, j] = -intersection
+    
+    # Solve the assignment problem using the Hungarian algorithm
+    row_indices, col_indices = linear_sum_assignment(cost_matrix)
+    
+    # Create a mapping from predicted labels to ground truth labels
+    pred_to_gt_mapping = {}
+    for row, col in zip(row_indices, col_indices):
+        pred_to_gt_mapping[unique_pred_labels[col]] = unique_gt_labels[row]
+    
+    # Relabel the predicted labels based on the mapping
+    remapped_pred_labels = np.zeros_like(pred_labels_1d)
+    for pred_label, gt_label in pred_to_gt_mapping.items():
+        remapped_pred_labels[pred_labels_1d == pred_label] = gt_label
+    
+    # Calculate accuracy as the fraction of correctly labeled pixels
+    accuracy = np.mean(remapped_pred_labels == gt_labels_1d)
+    return accuracy
+
+
+def show_segementation(image_path, labels, palette = VOC_PALETTE, gt_path = None):
+    """
+    Display an image with segmentation labels overlaid using a color palette.
+    
+    Args:
+        image_path (str): Path to the input image file.
+        labels (np.ndarray): Segmentation labels (2D or 3D array).
+        palette (dict): Color palette mapping label values to RGB colors.
+        gt_path (str): Path to the ground truth segmentation image file (optional).
+    """
+    image = cv2.imread(image_path)
+    h, w = image.shape[:2]
+    
+    # Create a blank image for the segmentation overlay
+    overlay = np.zeros((h, w, 3), dtype=np.uint8)
+    
+    # Map the labels to RGB colors using the palette
+    for rgb, label in palette.items():
+        mask = labels == label
+        overlay[mask] = rgb
+    
+    # Blend the overlay with the original image
+    alpha = 0.5
+    output = cv2.addWeighted(image, alpha, overlay, 1 - alpha, 0)
+    
+    # Display the original image, segmentation overlay, and blended output
+    cv2.imshow('Original Image', image)
+    cv2.imshow('Segmentation Overlay', overlay)
+    cv2.imshow('Segmentation Output', output)
+    if gt_path:
+        gt_image = cv2.imread(gt_path)
+        cv2.imshow('Ground Truth', gt_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 def evaluate(pred_labels, gt_path):
     gt_labels = convert_voc_gt_to_labels(gt_path) 
-    return calculate_miou(pred_labels, gt_labels)
+    miou = calculate_miou(pred_labels, gt_labels)
+    accuracy = calculate_accuracy(pred_labels, gt_labels)
+    return miou, accuracy

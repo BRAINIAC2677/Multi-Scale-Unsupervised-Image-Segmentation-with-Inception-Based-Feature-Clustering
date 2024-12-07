@@ -116,8 +116,8 @@ def train(config):
         optimizer.step()
 
         pred_labels = im_target.reshape(im.shape[0], im.shape[1])
-        miou = evaluate(pred_labels, config['gt'])
-        print(f'{batch_idx} / {config["maxIter"]} | label num : {nLabels} | loss : {loss.item():.5f} | miou : {miou:.5f}')
+        miou, accuracy = evaluate(pred_labels, config['gt'])
+        print(f'{batch_idx} / {config["maxIter"]} | label num : {nLabels} | loss : {loss.item():.5f} | miou : {miou:.5f} | accuracy : {accuracy:.5f}')
 
         if nLabels <= config['minLabels']:
             break

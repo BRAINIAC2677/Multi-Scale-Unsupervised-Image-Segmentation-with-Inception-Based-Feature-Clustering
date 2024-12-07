@@ -65,7 +65,7 @@ class InceptionNet(nn.Module):
 
         r = nChannel
 
-        print('last layer size:', r)
+        # print('last layer size:', r)
         if nConv>=1:
             self.conv3 = nn.Conv2d(128, r, kernel_size=1, stride=1, padding=0 )
         else:

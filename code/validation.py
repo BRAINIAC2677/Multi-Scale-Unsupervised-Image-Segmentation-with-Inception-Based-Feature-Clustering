@@ -7,7 +7,7 @@ import numpy as np
 import torch.nn.init
 import torch.nn.functional as F
 from train import predict
-from evaluate import evaluate
+from evaluate import evaluate, show_segementation
 
 use_cuda = torch.cuda.is_available()
 
@@ -45,6 +45,7 @@ args = parser.parse_args()
 if __name__ == '__main__':
     config = vars(args).copy()
     mious = []
+    accuracies = []
 
     if args.scribble:
         for img_filename in os.listdir(args.input):
@@ -58,7 +59,8 @@ if __name__ == '__main__':
                 mious.append(miou)
     else:
         img_filenames = os.listdir(args.input)
-        img_filenames = np.random.choice(img_filenames, args.nEvalImg, replace=False)
+        # img_filenames = np.random.choice(img_filenames, args.nEvalImg, replace=False)
+        img_filenames = img_filenames[0:args.nEvalImg]
         for i in range(len(img_filenames)):
             img_filename = img_filenames[i]
             gt_filename = img_filename.split('.')[0] + '.png'
@@ -67,11 +69,15 @@ if __name__ == '__main__':
 
             print(f'Evaluating {img_filename}...')
             pred_labels = predict(config)
-            miou = evaluate(pred_labels, config['gt'])
+            miou, accuracy = evaluate(pred_labels, config['gt'])
             mious.append(miou)
-            print(f'\n{i} / {args.nEvalImg} | {img_filename}: {miou}')
+            accuracies.append(accuracy)
+            print(f'\n{i} / {args.nEvalImg} | {img_filename} | miou: {miou} | accuracy: {accuracy}\n')
             print(f'Mean IoU: {np.mean(mious)}\n')
+            print(f'Mean Accuracy: {np.mean(accuracies)}\n')
+            show_segementation(config['input'], pred_labels, gt_path = config['gt'])
 
     for i in range(len(img_filenames)):
-        print(f'{img_filenames[i]}: {mious[i]}')
+        print(f'{img_filenames[i]} | mIoU: {mious[i]} | Accuracy: {accuracies[i]}')
     print(f'\nMean IoU: {np.mean(mious)}\n')
+    print (f'Mean Accuracy: {np.mean(accuracies)}\n')
