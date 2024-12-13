@@ -211,11 +211,9 @@ def calculate_nmi(pred_labels, gt_labels):
     Returns:
         float: Normalized Mutual Information (NMI) score.
     """
-    # Reshape the arrays into 1D
     gt_labels_1d = gt_labels.reshape(-1)
     pred_labels_1d = pred_labels.reshape(-1)
     
-    # Compute NMI between the predicted and ground truth labels
     nmi = normalized_mutual_info_score(gt_labels_1d, pred_labels_1d)
     return nmi
 
@@ -231,11 +229,9 @@ def calculate_homogeneity_score(pred_labels, gt_labels):
     Returns:
         float: Homogeneity score.
     """
-    # Reshape the arrays into 1D
     gt_labels_1d = gt_labels.reshape(-1)
     pred_labels_1d = pred_labels.reshape(-1)
     
-    # Compute homogeneity score between the predicted and ground truth labels
     homogeneity = homogeneity_score(gt_labels_1d, pred_labels_1d)
     return homogeneity
 

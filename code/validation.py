@@ -41,11 +41,12 @@ parser.add_argument('--stepsize_scr', metavar='SCR', default=0.5, type=float,
 args = parser.parse_args()
 
 
-
 if __name__ == '__main__':
     config = vars(args).copy()
     mious = []
     accuracies = []
+    nmis = []
+    homogeneities = []
 
     if args.scribble:
         for img_filename in os.listdir(args.input):
@@ -69,15 +70,21 @@ if __name__ == '__main__':
 
             print(f'Evaluating {img_filename}...')
             pred_labels = predict(config)
-            miou, accuracy = evaluate(pred_labels, config['gt'])
+            miou, accuracy, nmi, homogeneity_score = evaluate(pred_labels, config['gt'])
             mious.append(miou)
             accuracies.append(accuracy)
-            print(f'\n{i} / {args.nEvalImg} | {img_filename} | miou: {miou} | accuracy: {accuracy}\n')
-            print(f'Mean IoU: {np.mean(mious)}\n')
-            print(f'Mean Accuracy: {np.mean(accuracies)}\n')
-            show_segementation(config['input'], pred_labels, gt_path = config['gt'])
+            nmis.append(nmi)
+            homogeneities.append(homogeneity_score)
+            print(f'\n{i} / {args.nEvalImg} | {img_filename} | miou: {miou} | accuracy: {accuracy} | nmi: {nmi} | homogeneity: {homogeneity_score}\n')
+            # print(f'Mean IoU: {np.mean(mious)}\n')
+            # print(f'Mean Accuracy: {np.mean(accuracies)}\n')
+            # print(f'Mean NMI: {np.mean(nmis)}\n')
+            # print(f'Mean Homogeneity: {np.mean(homogeneities)}\n')
+            # show_segementation(config['input'], pred_labels, gt_path = config['gt'])
 
     for i in range(len(img_filenames)):
-        print(f'{img_filenames[i]} | mIoU: {mious[i]} | Accuracy: {accuracies[i]}')
+        print(f'{img_filenames[i]} | mIoU: {mious[i]} | Accuracy: {accuracies[i]} | NMI: {nmis[i]} | Homogeneity: {homogeneities[i]}')
     print(f'\nMean IoU: {np.mean(mious)}\n')
     print (f'Mean Accuracy: {np.mean(accuracies)}\n')
+    print (f'Mean NMI: {np.mean(nmis)}\n')
+    print (f'Mean Homogeneity: {np.mean(homogeneities)}\n')
