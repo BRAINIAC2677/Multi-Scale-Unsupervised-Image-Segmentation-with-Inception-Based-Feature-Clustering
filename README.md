@@ -1,5 +1,7 @@
 # Multi-Scale Unsupervised Image Segmentation with Inception-Based Feature Clustering
 
+- [*_Full Paper_*](/paper.pdf)
+
 ### Abstract
 his study presents an unsupervised image segmentation framework leveraging an InceptionNet-inspired architecture to cluster image pixels without labeled data. By integrating multi-scale feature extraction with differentiable clustering, the proposed method addresses the challenges of feature representation, spatial coherence, and adaptability in diverse datasets. Evaluated on PASCAL VOC 2012 and COCO-Stuff datasets, the model demonstrates robust segmentation performance, overcoming limitations of traditional methods reliant on hand-crafted features or fixed boundaries. The framework’s end-to-end optimization and clustering approach mark a significant step toward scalable and efficient unsupervised segmentation.
 
