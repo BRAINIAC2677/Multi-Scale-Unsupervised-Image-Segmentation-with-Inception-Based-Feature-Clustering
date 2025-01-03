@@ -10,7 +10,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 from evaluate import evaluate
-from mynet import MyNet
+from vanillacnn import VanillaCNN
 from inception import InceptionNet
 
 
@@ -44,39 +44,27 @@ def load_image(image_path):
 
 
 def train(config):
-    gpu_memory_info()
+    # gpu_memory_info()
     clear_gpu_cache()
-    gpu_memory_info()
+    # gpu_memory_info()
     data, im = load_image(config['input'])
 
-    # load scribble
-    if config['scribble']:
-        mask = cv2.imread(config['input'].replace('.'+config['input'].split('.')[-1],'_scribble.png'),-1)
-        mask = mask.reshape(-1)
-        mask_inds = np.unique(mask)
-        mask_inds = np.delete( mask_inds, np.argwhere(mask_inds==255) )
-        inds_sim = torch.from_numpy( np.where( mask == 255 )[ 0 ] )
-        inds_scr = torch.from_numpy( np.where( mask != 255 )[ 0 ] )
-        target_scr = torch.from_numpy( mask.astype(int) )
-        if use_cuda:
-            inds_sim = inds_sim.cuda()
-            inds_scr = inds_scr.cuda()
-            target_scr = target_scr.cuda()
-        target_scr = Variable( target_scr )
-        # set minLabels
-        config['minLabels'] = len(mask_inds)
-
     # train
-    model = InceptionNet( input_dim = data.size(1), nChannel = config['nChannel'], nConv = config['nConv'] )
+    if config['model'] == 'vanillacnn':
+        print ("Using VanillaCNN")
+        model = VanillaCNN( input_dim = data.size(1), nChannel = config['nChannel'], nConv = config['nConv'] )
+    elif config['model'] == 'inception':
+        print ("Using InceptionNet")
+        model = InceptionNet( input_dim = data.size(1), nChannel = config['nChannel'], nConv = config['nConv'] )
+    else: 
+        raise ValueError('Model not found')
+
     if use_cuda:
         model.cuda()
     model.train()
 
     # similarity loss definition
     loss_fn = torch.nn.CrossEntropyLoss()
-
-    # scribble loss definition
-    loss_fn_scr = torch.nn.CrossEntropyLoss()
 
     # continuity loss definition
     loss_hpy = torch.nn.L1Loss(reduction = 'mean')
@@ -107,17 +95,14 @@ def train(config):
         nLabels = len(np.unique(im_target))
 
         # loss 
-        if config['scribble']:
-            loss = config['stepsize_sim'] * loss_fn(output[ inds_sim ], target[ inds_sim ]) + config['stepsize_scr'] * loss_fn_scr(output[ inds_scr ], target_scr[ inds_scr ]) + config['stepsize_con'] * (lhpy + lhpz)
-        else:
-            loss = config['stepsize_sim'] * loss_fn(output, target) + config['stepsize_con'] * (lhpy + lhpz)
+        loss = config['stepsize_sim'] * loss_fn(output, target) + config['stepsize_con'] * (lhpy + lhpz)
             
         loss.backward()
         optimizer.step()
 
         pred_labels = im_target.reshape(im.shape[0], im.shape[1])
         miou, accuracy, nmi, homogeneity_score = evaluate(pred_labels, config['gt'])
-        print(f'{batch_idx} / {config["maxIter"]} | label num : {nLabels} | loss : {loss.item():.5f} | miou : {miou:.5f} | accuracy : {accuracy:.5f} | nmi : {nmi:.5f} | homogeneity : {homogeneity_score:.5f}')
+        print(f'{batch_idx + 1} / {config["maxIter"]} | label num : {nLabels} | loss : {loss.item():.5f} | miou : {miou:.5f} | accuracy : {accuracy:.5f} | nmi : {nmi:.5f} | homogeneity : {homogeneity_score:.5f}')
 
         if nLabels <= config['minLabels']:
             break

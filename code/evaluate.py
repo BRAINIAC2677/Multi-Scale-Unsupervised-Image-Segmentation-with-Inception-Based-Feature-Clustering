@@ -269,11 +269,16 @@ def show_segementation(image_path, labels, palette = None, gt_path = None):
     # Display the original image, segmentation overlay, and blended output
     cv2.imshow('Original Image', image)
     cv2.imshow('Segmentation Overlay', overlay)
-    # cv2.imshow('Segmentation Output', output)
+    cv2.imshow('Segmentation Output', output)
+    # save the output
+    cv2.imwrite('output.png', output)
+    cv2.imwrite('overlay.png', overlay)
+    cv2.imwrite('image.png', image)
 
     if gt_path:
         gt_image = cv2.imread(gt_path)
         cv2.imshow('Ground Truth', gt_image)
+        cv2.imwrite('gt.png', gt_image)
         gt_labels = convert_gt_to_labels(gt_path)
         remapped_labels = remap_labels(labels, gt_labels)
         for rgb, label in palette.items():
@@ -283,6 +288,7 @@ def show_segementation(image_path, labels, palette = None, gt_path = None):
         print(f"Number of unique labels in prediction: {len(np.unique(labels))}")
         print(f"Number of unique labels in remapped prediction: {len(np.unique(remapped_labels))}")
         cv2.imshow('Remapped Segmentation Overlay', overlay)
+        cv2.imwrite('remapped_overlay.png', overlay)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
